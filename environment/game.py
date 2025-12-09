@@ -5,9 +5,11 @@ sys.path.append('..')
 from constants import *
 from environment.car import Car
 from environment.truck import Truck
+from environment.level_config import LevelManager
 
 class Game:
-    def __init__(self):
+    def __init__(self, level='medium'):
+        self.level_config = LevelManager.get_level(level)
         self.reset()
     
     def reset(self):
@@ -19,21 +21,24 @@ class Game:
         self.won = False
         self.cars = []
         
-
         vehicle_pattern = 0
         for row in range(3, GRID_ROWS - 3):
-            if row % 5 != 0:  
+          
+            is_safe_zone = (row % self.level_config.safe_zone_spacing == 0)
+            if not is_safe_zone:  
                 direction = random.choice([-1, 1])
-                speed = random.uniform(0.05, 0.15)
+                speed = random.uniform(self.level_config.min_speed, self.level_config.max_speed)
                 color = random.choice([RED, BLUE, YELLOW, PURPLE])
                 
                 vehicle_pattern += 1
-                use_trucks = (vehicle_pattern % 12) > 9
+                use_trucks = (random.randint(0, 100) < self.level_config.truck_frequency)
                 
                 if use_trucks:
-                    num_vehicles = random.randint(1, 2)
+                    num_vehicles = random.randint(max(1, self.level_config.min_vehicles - 1), 
+                                                 max(2, self.level_config.max_vehicles - 2))
                 else:
-                    num_vehicles = random.randint(2, 4)
+                    num_vehicles = random.randint(self.level_config.min_vehicles, 
+                                                 self.level_config.max_vehicles)
                 
                 lane_vehicles = []
                 for i in range(num_vehicles):
@@ -59,6 +64,10 @@ class Game:
                             lane_vehicles.append(temp_vehicle)
                             self.cars.append(temp_vehicle)
                             break
+    
+    def set_level(self, level_name):
+        self.level_config = LevelManager.get_level(level_name)
+        self.reset()
     
     def move_player(self, direction):
         if self.game_over or self.won:
@@ -101,7 +110,7 @@ class Game:
         screen.fill(WHITE)
         
         for row in range(GRID_ROWS):
-            if row < 3 or row >= GRID_ROWS - 3 or row % 5 == 0:
+            if row < 3 or row >= GRID_ROWS - 3 or row % self.level_config.safe_zone_spacing == 0:
                 color = DARK_GREEN
             else:
                 color = DARK_GRAY
@@ -118,6 +127,9 @@ class Game:
         font = pygame.font.Font(None, 24)
         score_text = font.render(f'Score: {self.score}', True, BLACK)
         screen.blit(score_text, (10, 10))
+        
+        level_text = font.render(f'Level: {self.level_config.name}', True, BLACK)
+        screen.blit(level_text, (10, 35))
         
         font_large = pygame.font.Font(None, 36)
         if self.game_over:

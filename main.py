@@ -10,7 +10,8 @@ pygame.display.set_caption("Crossy Road Bots")
 
 clock = pygame.time.Clock()
 
-game = Game()
+# Start with medium difficulty (can be changed to 'easy', 'medium', or 'medium-hard')
+game = Game(level='medium')
 
 running = True
 while running:
@@ -29,6 +30,13 @@ while running:
                 game.move_player('right')
             elif event.key == pygame.K_r:
                 game.reset()
+
+            elif event.key == pygame.K_1:
+                game.set_level('easy')
+            elif event.key == pygame.K_2:
+                game.set_level('medium')
+            elif event.key == pygame.K_3:
+                game.set_level('medium-hard')
     
     game.update()
     
