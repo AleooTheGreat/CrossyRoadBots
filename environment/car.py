@@ -31,4 +31,4 @@ class Car:
     def collides_with(self, player_row, player_col):
         if self.row != player_row:
             return False
-        return self.col <= player_col < self.col + self.width
+        return self.col <= player_col <= self.col + self.width
