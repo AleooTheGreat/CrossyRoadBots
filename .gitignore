@@ -32,7 +32,7 @@ venv.bak/
 
 # PyCharm
 .idea/
-__pycache__/
+
 # VS Code
 .vscode/
 
@@ -51,18 +51,12 @@ __pycache__/
 dmypy.json
 
 # Training artifacts
-agents/
-*.pkl
-*.pth
-*.h5
-*.model
 
 # Plots and logs
 *.png
 *.jpg
 *.log
 training_logs/
-checkpoints/
 
 # OS
 .DS_Store
