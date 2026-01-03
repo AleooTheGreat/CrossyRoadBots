@@ -3,6 +3,7 @@ import sys
 from constants import *
 from environment.game import Game
 
+
 pygame.init()
 
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -10,7 +11,7 @@ pygame.display.set_caption("Crossy Road Bots")
 
 clock = pygame.time.Clock()
 
-game = Game(level='medium')
+game = Game(level='easy')
 
 running = True
 while running:
