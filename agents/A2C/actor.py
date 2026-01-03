@@ -14,16 +14,20 @@ class Actor(torch.nn.Module):
             torch.nn.Softmax(dim=-1)
         )
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=3e-4)
 
     
     def forward(self, x: torch.Tensor):
         policy = self.layers(x)
         return policy
 
-    def select_action(self, state: torch.Tensor):
+    def select_action(self, state: torch.Tensor, train: bool = True):
         probs = self.forward(state)
-        dist = torch.distributions.Categorical(probs)
-        action = dist.sample()
 
-        return action.item(), dist.log_prob(action)
+        if train:
+            dist = torch.distributions.Categorical(probs)
+            action = dist.sample()
+            return action.item(), dist.log_prob(action), dist.entropy()
+        else:
+            action = torch.argmax(probs)
+            return action.item(), 0.0

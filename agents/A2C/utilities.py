@@ -6,7 +6,7 @@ class Utilities:
     @staticmethod
     def get_game_state(game: Game, radius: int = 3):
         side_length = radius * 2 + 1
-        state_grid = np.full((side_length, side_length), -1.0, dtype=np.float32)
+        state_grid = np.zeros((side_length, side_length), dtype=np.float32)
 
         for row in range(-radius, radius + 1):
             for col in range(-radius, radius + 1):
@@ -18,14 +18,14 @@ class Utilities:
                     # check if it's a safe zone or road
                     is_safe = grid_row < 3 or grid_row >= GRID_ROWS - 3 or grid_row % game.level_config.safe_zone_spacing == 0
                     if is_safe:
-                        state_grid[row + radius, col + radius] = 1.0
-                    else:
-                        state_grid[row + radius, col + radius] = 0.0
+                        state_grid[row + radius, col + radius] = 0.5
 
                     # if player collides with a car
                     for car in game.cars:
                         if car.collides_with(grid_row, grid_col):
-                            state_grid[row + radius, col + radius] = 2.0
+                            state_grid[row + radius, col + radius] = car.direction
                             break
+                else:
+                    state_grid[row + radius, col + radius] = -10.0
 
         return state_grid.flatten()

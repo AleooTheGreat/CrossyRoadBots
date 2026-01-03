@@ -5,14 +5,14 @@ class Critic(torch.nn.Module):
         super(Critic, self).__init__()
 
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(input_dim, 128),
+            torch.nn.Linear(input_dim, 256),
             torch.nn.ReLU(),
-            torch.nn.Linear(128, 64),
+            torch.nn.Linear(256, 128),
             torch.nn.ReLU(),
-            torch.nn.Linear(64, 1)
+            torch.nn.Linear(128, 1)
         )
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=5e-3)
 
     def forward(self, x: torch.Tensor):
         return self.layers(x)
