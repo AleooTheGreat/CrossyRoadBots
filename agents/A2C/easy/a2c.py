@@ -216,9 +216,9 @@ if __name__ == "__main__":
 
     RENDER = False
     EPISODES = 2000
-    LEVEL = 'medium'
+    LEVEL = 'easy'
     EPISODE_LENGTH = 1000
-    RADIUS = 5
+    RADIUS = 4
 
     best_avg_score = -float("inf")
     SAVE_WINDOW = 20
