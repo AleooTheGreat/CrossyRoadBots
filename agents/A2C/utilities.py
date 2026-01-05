@@ -5,7 +5,7 @@ from agents.A2C.parameters import *
 class Utilities:
     
     @staticmethod
-    def get_game_state(game: Game, radius: int = 3):
+    def get_game_state(game: Game, radius: int = 4):
         side_length = radius * 2 + 1
         state_grid = np.zeros((side_length, side_length), dtype=np.float32)
 

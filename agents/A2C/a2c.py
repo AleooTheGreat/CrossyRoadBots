@@ -19,10 +19,10 @@ class A2C(BaseAgent):
     def __init__(
             self, 
             n_steps: int = 20,
-            lr: float = 3e-4,
+            lr: float = 1e-4,
             gamma: float = 0.99,
-            radius: int = 3,
-            action_dim: int = 5
+            radius: int = 4,
+            action_dim: int = 4
     ):
         self.input_dim = (2 * radius + 1) ** 2
         super(A2C, self).__init__(agent_name="A2C", state_size=self.input_dim, action_size=action_dim)
@@ -209,9 +209,8 @@ if __name__ == "__main__":
 
     RENDER = False
     EPISODES = 100000
-    LEVEL = 'medium-hard'
+    LEVEL = 'easy'
     EPISODE_LENGTH = 1000
-    RADIUS = 4
 
     best_avg_score = -float("inf")
     SAVE_WINDOW = 12
@@ -220,13 +219,13 @@ if __name__ == "__main__":
     score_history = []
     logs = []
 
-    agent = A2C(action_dim=4, radius=RADIUS, lr=1e-4, n_steps=20)
+    agent = A2C()
     game = Game(level=LEVEL)
 
     for episode in range(EPISODES):
         game.reset()
 
-        state = Utilities.get_game_state(game, radius=RADIUS)
+        state = Utilities.get_game_state(game)
         done = False
         episode_reward = 0
         counter = 0
@@ -265,7 +264,7 @@ if __name__ == "__main__":
                 pygame.display.flip()
                 clock.tick(60)
 
-            next_state = Utilities.get_game_state(game, radius=RADIUS)
+            next_state = Utilities.get_game_state(game)
 
             reward = 0.0
 
