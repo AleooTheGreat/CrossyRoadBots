@@ -209,7 +209,7 @@ if __name__ == "__main__":
 
     RENDER = False
     EPISODES = 100000
-    LEVEL = 'easy'
+    LEVEL = 'medium'
     EPISODE_LENGTH = 1000
 
     best_avg_score = -float("inf")
