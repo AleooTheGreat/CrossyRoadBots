@@ -44,62 +44,55 @@ class A2C(BaseAgent):
         
     # Override
     def select_action(self, state):
-        state_tensor = torch.tensor(state, dtype=torch.float32)
-        logits = self.policy(state_tensor)
-        dist = torch.distributions.Categorical(logits=logits)
-
+        state = torch.tensor(state, dtype=torch.float32)
+        logits = self.policy(state)
+        probs = F.softmax(logits, dim=-1)
+        dist = torch.distributions.Categorical(probs)
         action = dist.sample()
         logp = dist.log_prob(action)
+        value = self.value(state)
 
-        value = self.value(state_tensor).squeeze(-1)  # FIX SHAPE
-        entropy = dist.entropy()
-
-        return action.item(), logp, value, entropy
+        return action.item(), logp, value
 
     
 
     # Override
-    def train_step(self, rewards, logps, values, entropies, next_state, masks):
-        values = torch.stack(values)
-        logps = torch.stack(logps)
-        entropies = torch.stack(entropies)
-
-
+    def train_step(self, rewards, logps, values, next_state, done):
         with torch.no_grad():
-            next_value = self.value(
-                torch.tensor(next_state, dtype=torch.float32)
-            ).squeeze(-1).detach()
-
-
+            if done:
+                next_value = torch.tensor([0.0])
+            else:
+                next_value = self.value(torch.tensor(next_state, dtype=torch.float32))
 
         # 1. Compute n-step return
-        returns = torch.zeros_like(values)
+        returns = []
         G = next_value
 
         for step in reversed(range(len(rewards))):
-            G = rewards[step] + self.gamma * G * masks[step]
-            returns[step] = G
+            G = rewards[step] + self.gamma * G
+            returns.insert(0, G)
 
-        advantages = returns.detach() - values
+        returns = torch.cat(returns)
+        values = torch.cat(values)
 
+        advantages = returns - values
 
-        # 4. Loss-uri
-        ENTROPY_BETA = 0.05
-        actor_loss = -(logps * advantages.detach() + ENTROPY_BETA * entropies).mean()
+        # actor loss
+        logps = torch.stack(logps)
+        actor_loss = -(logps * advantages.detach()).mean()
         self.list_actor_losses.append(actor_loss.item())
-        
-        # Critic: Folosește Mean Squared Error pe valorile reale (Returns vs Values)
-        # NU folosi varianta normalizată aici!
-        critic_loss = 0.5 * advantages.pow(2).mean()
+
+        # critic loss
+        critic_loss = advantages.pow(2).mean()
         self.list_critic_losses.append(critic_loss.item())
 
-        # Total loss
-        loss = actor_loss + critic_loss
+        # total loss
+        loss = actor_loss + 0.5 * critic_loss
         self.list_losses.append(loss.item())
-
 
         self.optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(list(self.policy.parameters()) + list(self.value.parameters()), max_norm=0.5)
         self.optimizer.step()
 
 
@@ -215,19 +208,19 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
 
     RENDER = False
-    EPISODES = 2000
+    EPISODES = 30000
     LEVEL = 'easy'
     EPISODE_LENGTH = 1000
     RADIUS = 4
 
     best_avg_score = -float("inf")
-    SAVE_WINDOW = 20
+    SAVE_WINDOW = 12
     
     reward_history = []
     score_history = []
     logs = []
 
-    agent = A2C(action_dim=4, radius=RADIUS, lr=1e-4)
+    agent = A2C(action_dim=4, radius=RADIUS, lr=1e-4, n_steps=20)
     game = Game(level=LEVEL)
 
     for episode in range(EPISODES):
@@ -240,7 +233,7 @@ if __name__ == "__main__":
         max_reached_row = game.player_row
         score = 0
 
-        rewards, logps, values, entropies, masks = [], [], [], [], []
+        rewards, logps, values = [], [], []
 
 
         while not done:
@@ -251,7 +244,7 @@ if __name__ == "__main__":
                     pygame.quit()
                     sys.exit()
 
-            action, logp, value, entropy = agent.select_action(state)
+            action, logp, value = agent.select_action(state)
 
             prev_row = game.player_row
             
@@ -293,21 +286,19 @@ if __name__ == "__main__":
                     reward += ADVANCEMENT_REWARD
                     max_reached_row = game.player_row
                 elif game.player_row > prev_row:
-                    reward -= REGRESSION_PENALTY
+                    reward += REGRESSION_PENALTY
 
 
             rewards.append(reward)
             logps.append(logp)
             values.append(value)
-            entropies.append(entropy)
-            masks.append(1.0 - float(done))
 
             episode_reward += reward
             state = next_state
 
             if len(rewards) >= agent.n_steps or done:
-                agent.train_step(rewards, logps, values, entropies, next_state, masks)
-                rewards, logps, values, entropies, masks = [], [], [], [], []
+                agent.train_step(rewards, logps, values, next_state, done)
+                rewards, logps, values = [], [], []
 
         score += game.score
 
@@ -322,7 +313,9 @@ if __name__ == "__main__":
         if avg_score > best_avg_score:
             best_avg_score = avg_score
             agent.save(f"a2c_{LEVEL}_best.pth")
-            print(f"[SAVE] New best avg score: {best_avg_score:.2f}")
+            log = f"[SAVE] New best avg score: {best_avg_score:.2f}"
+            print(log)
+            logs.append(log)
 
         if int(best_avg_score) >= 490:
             print("Environment solved!")

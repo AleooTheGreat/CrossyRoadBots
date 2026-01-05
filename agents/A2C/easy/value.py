@@ -5,9 +5,9 @@ class ValueNet(torch.nn.Module):
         super(ValueNet, self).__init__()
 
         self.value = torch.nn.Sequential(
-            torch.nn.Linear(input_dim, 256), # Mărit de la 128
+            torch.nn.Linear(input_dim, 256),
             torch.nn.ReLU(),
-            torch.nn.Linear(256, 128),       # Mărit de la 64
+            torch.nn.Linear(256, 128),
             torch.nn.ReLU(),
             torch.nn.Linear(128, 1),
         )
