@@ -155,3 +155,4 @@ class Game:
         radius = CELL_SIZE // 2 - 2
         pygame.draw.circle(screen, GREEN, (center_x, center_y), radius)
         pygame.draw.circle(screen, BLACK, (center_x, center_y), radius, 2)
+
