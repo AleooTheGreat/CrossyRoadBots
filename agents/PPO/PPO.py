@@ -13,7 +13,7 @@ class PPO:
         self.K = K
         self.gae_lambda = gae_lambda
         
-        self.device = ('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         self.policy = ActorCritic(state_dim, action_dim, hidden_dim)
         
