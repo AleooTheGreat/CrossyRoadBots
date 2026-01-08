@@ -6,15 +6,18 @@ import glob
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from constants import *
 from environment.game import Game
-from agents.PPO.ppo_agent import PPOAgent
+from agents.PPO.PPO import PPO
 import numpy as np
 
 def state_to_vector(game):
+    
     player_pos = [game.player_row / GRID_ROWS, game.player_col / GRID_COLS]
     
     nearby_cars = []
+    
     for row_offset in range(-3, 4):
         for col_offset in range(-3, 4):
+            
             check_row = game.player_row + row_offset
             check_col = game.player_col + col_offset
             
@@ -31,12 +34,15 @@ def state_to_vector(game):
     state = player_pos + nearby_cars
     return np.array(state, dtype=np.float32)
 
-def find_latest_model(difficulty='medium'):
+def find_latest_model(difficulty = 'medium'):
+    
     checkpoints_dir = 'agents/PPO/checkpoints'
+    
     if not os.path.exists(checkpoints_dir):
         return None
     
     runs = [d for d in os.listdir(checkpoints_dir) if d.startswith('run_') and d.endswith(f'_{difficulty}')]
+    
     if not runs:
         return None
     
@@ -59,7 +65,8 @@ def find_latest_model(difficulty='medium'):
     
     return None
 
-def run_watch(difficulty='medium', model_path=None):
+def run_watch(difficulty = 'medium', model_path = None):
+    
     pygame.init()
 
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -67,22 +74,25 @@ def run_watch(difficulty='medium', model_path=None):
 
     clock = pygame.time.Clock()
 
-    state_dim = 2 + 7 * 7
+    state_dim = 51
     action_dim = 5
-    agent = PPOAgent(state_dim, action_dim, hidden_dim=512)
+    agent = PPO(state_dim, action_dim, hidden_dim=512)
 
     if model_path:
         if not os.path.exists(model_path):
             print(f"Error: Model not found at {model_path}")
             return
+        
         final_model_path = model_path
     else:
         final_model_path = find_latest_model(difficulty)
     
     if final_model_path:
+        
         agent.load(final_model_path)
         agent.policy.to(agent.device)
-        agent.policy_old.to(agent.device)
+        agent.old_policy.to(agent.device)
+        
         print(f"Loaded trained PPO agent from: {final_model_path}")
         print(f"Difficulty: {difficulty.capitalize()}")
         print(f"Running on: {agent.device}")
@@ -96,7 +106,9 @@ def run_watch(difficulty='medium', model_path=None):
     playing = True
 
     while running:
+        
         for event in pygame.event.get():
+            
             if event.type == pygame.QUIT:
                 running = False
             
@@ -108,6 +120,7 @@ def run_watch(difficulty='medium', model_path=None):
                     playing = not playing
         
         if playing and not game.game_over and not game.won:
+            
             state = state_to_vector(game)
             action = agent.select_action(state)
             
@@ -129,10 +142,13 @@ def run_watch(difficulty='medium', model_path=None):
     pygame.quit()
 
 if __name__ == "__main__":
+    
     parser = argparse.ArgumentParser(description='Watch trained PPO agent play Crossy Road')
+    
     parser.add_argument('--difficulty', type=str, default='medium',
                         choices=['easy', 'medium', 'medium-hard'],
                         help='Game difficulty level (default: medium)')
+    
     parser.add_argument('--model-path', type=str, default=None,
                         help='Path to specific model file (optional, defaults to latest for difficulty)')
     
