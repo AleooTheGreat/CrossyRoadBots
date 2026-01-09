@@ -10,7 +10,7 @@ pygame.display.set_caption("Crossy Road Bots")
 
 clock = pygame.time.Clock()
 
-game = Game(level='easy')
+game = Game(level='medium')
 
 running = True
 while running:
