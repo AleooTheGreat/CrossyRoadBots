@@ -63,7 +63,7 @@ def train_ppo(episodes = 10000, max_steps = 500, update_frequency = 2048, diffic
     game = Game(level=difficulty)
     
     state_dim = 51
-    action_dim = 5
+    action_dim = 4
     
     agent = PPO(state_dim, action_dim, lr = 3e-4, gamma = 0.99, eps_clip = 0.2, K = 4, hidden_dim = 512)
     agent.policy.to(device)
@@ -89,7 +89,7 @@ def train_ppo(episodes = 10000, max_steps = 500, update_frequency = 2048, diffic
             
             action = agent.select_action(state)
             
-            actions_map = ['up', 'down', 'left', 'right', 'stay']
+            actions_map = ['up', 'down', 'left', 'right']
             if action < 4:
                 game.move_player(actions_map[action])
             
@@ -137,6 +137,14 @@ def train_ppo(episodes = 10000, max_steps = 500, update_frequency = 2048, diffic
                 best_path = os.path.join(run_folder, 'ppo_best.pth')
                 agent.save(best_path)
                 print(f"New best average score: {best_avg_score:.4f} - Model saved!")
+            
+            if len(avg_scores) >= 10:
+                mean_of_last_10_avgs = np.mean(avg_scores[-10:])
+                if mean_of_last_10_avgs >= 490:
+                    print(f"\n Early stopping")
+                    print(f"Mean of last 10 averages: {mean_of_last_10_avgs:.4f}")
+                    print(f"Training completed at episode {episode}")
+                    break
         
         if episode % checkpoint_interval == 0 and episode > 0:
             checkpoint_path = os.path.join(run_folder, f'ppo_checkpoint_{episode}.pth')

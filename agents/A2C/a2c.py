@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 from agents.A2C.policy import PolicyNet
 from agents.A2C.value import ValueNet
 from environment.game import *
-from base_agent import BaseAgent
-from utilities import Utilities
+from agents.base_agent import BaseAgent
+from agents.A2C.utilities import Utilities
 from agents.A2C.parameters import *
 
 class A2C(BaseAgent):

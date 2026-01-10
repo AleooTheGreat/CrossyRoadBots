@@ -8,8 +8,9 @@ from environment.truck import Truck
 from environment.level_config import LevelManager
 
 class Game:
-    def __init__(self, level='medium'):
+    def __init__(self, level='medium', infinite_mode=False):
         self.level_config = LevelManager.get_level(level)
+        self.infinite_mode = infinite_mode
         self.reset()
     
     def reset(self):
@@ -20,6 +21,7 @@ class Game:
         self.game_over = False
         self.won = False
         self.cars = []
+        self.rows_generated = GRID_ROWS  # Track how many rows we've generated
         
         vehicle_pattern = 0
         for row in range(3, GRID_ROWS - 3):
@@ -92,8 +94,13 @@ class Game:
             self.score += (self.highest_row - self.player_row) * 10
             self.highest_row = self.player_row
         
-        if self.player_row == 0:
+        # In infinite mode, never win, just keep generating rows
+        if not self.infinite_mode and self.player_row == 0:
             self.won = True
+        
+        # Generate new rows if player is advancing in infinite mode
+        if self.infinite_mode and self.player_row < 10:
+            self._generate_new_rows()
     
     def update(self):
         if self.game_over or self.won:
@@ -155,4 +162,58 @@ class Game:
         radius = CELL_SIZE // 2 - 2
         pygame.draw.circle(screen, GREEN, (center_x, center_y), radius)
         pygame.draw.circle(screen, BLACK, (center_x, center_y), radius, 2)
+    
+    def _generate_new_rows(self):
+        """Generate new rows at the top for infinite mode."""
+        # Shift all cars down
+        shift_amount = 10
+        for car in self.cars:
+            car.row += shift_amount
+        
+        # Remove cars that are too far down
+        self.cars = [car for car in self.cars if car.row < GRID_ROWS + 20]
+        
+        # Adjust player and tracking
+        self.player_row += shift_amount
+        self.highest_row += shift_amount
+        
+        # Generate new rows at the top
+        for row in range(3, 3 + shift_amount):
+            is_safe_zone = (row % self.level_config.safe_zone_spacing == 0)
+            if not is_safe_zone:
+                direction = random.choice([-1, 1])
+                speed = random.uniform(self.level_config.min_speed, self.level_config.max_speed)
+                color = random.choice([RED, BLUE, YELLOW, PURPLE])
+                
+                use_trucks = (random.randint(0, 100) < self.level_config.truck_frequency)
+                
+                if use_trucks:
+                    num_vehicles = random.randint(max(1, self.level_config.min_vehicles - 1), 
+                                                 max(2, self.level_config.max_vehicles - 2))
+                else:
+                    num_vehicles = random.randint(self.level_config.min_vehicles, 
+                                                 self.level_config.max_vehicles)
+                
+                lane_vehicles = []
+                for i in range(num_vehicles):
+                    base_col = (GRID_COLS // num_vehicles) * i
+                    col = base_col + random.randint(-2, 2)
+                    
+                    if use_trucks:
+                        temp_vehicle = Truck(row, col, speed, direction, color)
+                    else:
+                        temp_vehicle = Car(row, col, speed, direction, color)
+                    
+                    overlaps = False
+                    for existing_vehicle in lane_vehicles:
+                        min_spacing = temp_vehicle.width + existing_vehicle.width
+                        if abs(col - existing_vehicle.col) < min_spacing:
+                            overlaps = True
+                            break
+                    
+                    if not overlaps:
+                        lane_vehicles.append(temp_vehicle)
+                        self.cars.append(temp_vehicle)
+        
+        self.rows_generated += shift_amount
 

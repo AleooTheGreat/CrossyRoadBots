@@ -2,40 +2,32 @@ import numpy as np
 from constants import GRID_ROWS, GRID_COLS
 
 
-def get_state(game, view_range=5):  # Rename to get_local_state to match your other files
-    """
-    Returns a flattened grid centered on the player.
-    Uses exact collision logic to ensure no 'invisible' cars.
-    """
-    # 1. Create full grid
-    full_grid = np.zeros((GRID_ROWS, GRID_COLS), dtype=np.float32)
-
-    # 2. Mark Cars using EXACT collision logic
+def get_state(game, view_range=5):
+    
+    window_size = view_range * 2 + 1
+    local_view = np.zeros((window_size, window_size), dtype=np.float32)
+    
     for car in game.cars:
-        r = car.row
-        # Optimization: Only check columns near the car instead of 0..24
-        # We look a bit wider (width+1) to be safe against float boundaries
+        car_row = car.row
+        
         start_check = int(car.col) - 1
         end_check = int(car.col + car.width) + 2
 
-        for c in range(start_check, end_check):
-            if 0 <= c < GRID_COLS:
-                # If the game says this column kills the player, mark it as 1.0
-                if car.collides_with(r, c):
-                    full_grid[r][c] = 1.0
-
-    # 3. Padding (Walls = 2.0)
-    padded_grid = np.pad(full_grid, pad_width=view_range, mode='constant', constant_values=2.0)
-
-    # 4. Extract Window
-    p_r = game.player_row + view_range
-    p_c = game.player_col + view_range
-
-    r_start = p_r - view_range
-    r_end = p_r + view_range + 1
-    c_start = p_c - view_range
-    c_end = p_c + view_range + 1
-
-    local_view = padded_grid[r_start:r_end, c_start:c_end]
+        for check_col in range(start_check, end_check):
+            if 0 <= check_col < GRID_COLS:
+                if car.collides_with(car_row, check_col):
+                    
+                    row_offset = car_row - game.player_row + view_range
+                    col_offset = check_col - game.player_col + view_range
+                    
+                    if 0 <= row_offset < window_size and 0 <= col_offset < window_size:
+                        local_view[row_offset][col_offset] = 1.0
+    
+    for r_offset in range(window_size):
+        for c_offset in range(window_size):
+            actual_col = game.player_col - view_range + c_offset
+            
+            if not (0 <= actual_col < GRID_COLS):
+                local_view[r_offset][c_offset] = 2.0
 
     return local_view.flatten()
