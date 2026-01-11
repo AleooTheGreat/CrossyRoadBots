@@ -10,12 +10,16 @@ from environment.game import Game
 from agents.DOUBLE_Q.double_q_agent import DoubleQAgent
 from constants import GRID_ROWS, GRID_COLS
 
+ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]
+ACTIONS_MAP = {
+    "UP": "up",
+    "DOWN": "down",
+    "LEFT": "left",
+    "RIGHT": "right",
+}
 
-ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]  # tabular: fără NOOP
-ACTIONS_MAP = ["up", "down", "left", "right"]
 
-
-def get_next_run_folder(difficulty="medium"):
+def get_next_run_folder(difficulty="hard"):
     checkpoints_dir = "agents/DOUBLE_Q/checkpoints"
     os.makedirs(checkpoints_dir, exist_ok=True)
 
@@ -32,7 +36,6 @@ def get_next_run_folder(difficulty="medium"):
 
 
 def _car_velocity(car) -> float:
-    
     sp = float(getattr(car, "speed", 0.0))
     d = getattr(car, "direction", None)
     if d is None:
@@ -44,9 +47,9 @@ def _car_velocity(car) -> float:
 
 
 def _ttc_bin_for_cell(game, target_row: int, target_col: int, horizon: int = 3) -> int:
-  
     if target_row < 0 or target_row >= GRID_ROWS or target_col < 0 or target_col >= GRID_COLS:
-        return 0  
+        return 0
+
     earliest = None
     for car in game.cars:
         if int(car.row) != int(target_row):
@@ -78,7 +81,17 @@ def _lane_is_road(game, row: int) -> int:
 
 
 def state_to_tabular(game, horizon: int = 3) -> tuple:
-   
+    """
+    Returns:
+      (
+        pc,
+        lane_cur, lane_up,
+        in_up, in_down, in_left, in_right,
+        ttc_up, ttc_up_l, ttc_up_r,
+        ttc_cur, ttc_cur_l, ttc_cur_r,
+        ttc_down
+      )
+    """
     pr, pc = int(game.player_row), int(game.player_col)
 
     in_up = 1 if pr - 1 >= 0 else 0
@@ -96,11 +109,6 @@ def state_to_tabular(game, horizon: int = 3) -> tuple:
 
     ttc_down = _ttc_bin_for_cell(game, pr + 1, pc, horizon=horizon) if in_down else 0
 
-    safe_up = 1 if (in_up and ttc_up >= 2) else 0
-    safe_down = 1 if (in_down and ttc_down >= 2) else 0
-    safe_left = 1 if (in_left and ttc_cur_l >= 2) else 0
-    safe_right = 1 if (in_right and ttc_cur_r >= 2) else 0
-
     lane_cur = _lane_is_road(game, pr)
     lane_up = _lane_is_road(game, pr - 1) if in_up else 0
 
@@ -108,16 +116,14 @@ def state_to_tabular(game, horizon: int = 3) -> tuple:
         pc,
         lane_cur, lane_up,
         in_up, in_down, in_left, in_right,
-        safe_up, safe_down, safe_left, safe_right,
         ttc_up, ttc_up_l, ttc_up_r,
         ttc_cur, ttc_cur_l, ttc_cur_r,
+        ttc_down,
     )
 
 
 def compute_reward(env, r_before, c_before, level_best_row, prev_ep_best_row, curr_ep_best_row):
-   
     r_after = int(env.player_row)
-    c_after = int(env.player_col)
 
     if env.game_over:
         return -2.0, True, level_best_row, prev_ep_best_row, curr_ep_best_row
@@ -147,7 +153,7 @@ def compute_reward(env, r_before, c_before, level_best_row, prev_ep_best_row, cu
 def train_double_q(
     episodes=100000,
     max_steps=800,
-    difficulty="medium",
+    difficulty="hard",
     checkpoint_interval=1000,
     horizon=3,
     eps_start=1.0,
@@ -207,24 +213,21 @@ def train_double_q(
             c_before = int(env.player_col)
 
             a = agent.select_action(s)
-            a_idx = ACTIONS.index(a)
 
-            env.move_player(ACTIONS_MAP[a_idx])
+            if a != "NOOP":
+                env.move_player(ACTIONS_MAP[a])
+
             env.update()
 
             if env.won:
                 won = 1
 
-            # reward
             reward, done, level_best_row, prev_ep_best_row, curr_ep_best_row = compute_reward(
                 env, r_before, c_before, level_best_row, prev_ep_best_row, curr_ep_best_row
             )
             ep_reward += reward
 
-            if int(env.player_row) <= curr_ep_best_row:
-                pass
             if int(env.player_row) == curr_ep_best_row:
-                
                 steps_since_progress += 1
             else:
                 steps_since_progress = 0
@@ -237,12 +240,9 @@ def train_double_q(
             agent.update(s, a, reward, s_next, done)
             s = s_next
 
-        # end episode: update prev_ep_best_row
         prev_ep_best_row = curr_ep_best_row
-
         scores.append(env.score)
 
-        # schedules
         agent.set_epsilon(max(eps_end, agent.epsilon * eps_decay))
         agent.set_alpha(max(alpha_min, agent.alpha * alpha_decay))
 
@@ -285,7 +285,7 @@ def train_double_q(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train TABULAR Double Q-Learning for Crossy Road (PPO-like structure)")
     parser.add_argument("--episodes", type=int, default=100000)
-    parser.add_argument("--difficulty", type=str, default="medium", choices=["easy", "medium", "medium-hard"])
+    parser.add_argument("--difficulty", type=str, default="hard", choices=["easy", "medium", "hard"])
     parser.add_argument("--checkpoint-interval", type=int, default=1000)
     parser.add_argument("--max-steps", type=int, default=800)
 
