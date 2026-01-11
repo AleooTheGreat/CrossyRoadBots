@@ -19,7 +19,7 @@ ACTIONS_MAP = {
 }
 
 
-def get_next_run_folder(difficulty="hard"):
+def get_next_run_folder(difficulty="medium-hard"):
     checkpoints_dir = "agents/DOUBLE_Q/checkpoints"
     os.makedirs(checkpoints_dir, exist_ok=True)
 
@@ -153,7 +153,7 @@ def compute_reward(env, r_before, c_before, level_best_row, prev_ep_best_row, cu
 def train_double_q(
     episodes=100000,
     max_steps=800,
-    difficulty="hard",
+    difficulty="medium-hard",
     checkpoint_interval=1000,
     horizon=3,
     eps_start=1.0,
@@ -285,7 +285,7 @@ def train_double_q(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train TABULAR Double Q-Learning for Crossy Road (PPO-like structure)")
     parser.add_argument("--episodes", type=int, default=100000)
-    parser.add_argument("--difficulty", type=str, default="hard", choices=["easy", "medium", "hard"])
+    parser.add_argument("--difficulty", type=str, default="medium-hard", choices=["easy", "medium", "medium-hard"])
     parser.add_argument("--checkpoint-interval", type=int, default=1000)
     parser.add_argument("--max-steps", type=int, default=800)
 

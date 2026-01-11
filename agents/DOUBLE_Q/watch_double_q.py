@@ -108,7 +108,7 @@ def find_latest_model(difficulty):
     return max(ckpts, key=lambda p: int(p.split("_")[-1].replace(".pkl", ""))) if ckpts else None
 
 
-def run_watch(difficulty="hard", model_path=None, horizon=3, fps=60):
+def run_watch(difficulty="medium-hard", model_path=None, horizon=3, fps=60):
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption(f"Double Q-Learning TABULAR ({difficulty})")

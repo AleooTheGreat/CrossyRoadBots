@@ -141,7 +141,7 @@ class PPO:
     
     def load(self, filepath):
         
-        checkpoint = torch.load(filepath)
+        checkpoint = torch.load(filepath, map_location=torch.device('cpu'))
         
         self.policy.load_state_dict(checkpoint['policy_state_dict'])
         self.old_policy.load_state_dict(checkpoint['policy_state_dict'])

@@ -328,7 +328,7 @@ class RainbowDQNAgent(BaseAgent):
 
     def load(self, filepath):
         if os.path.exists(filepath):
-            checkpoint = torch.load(filepath)
+            checkpoint = torch.load(filepath, map_location=torch.device('cpu'))
             self.online_net.load_state_dict(checkpoint['online_net'])
             self.target_net.load_state_dict(checkpoint['target_net'])
             self.optimizer.load_state_dict(checkpoint['optimizer'])

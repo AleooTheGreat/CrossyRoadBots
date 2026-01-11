@@ -75,7 +75,7 @@ def run_watch(difficulty = 'medium', model_path = None):
     clock = pygame.time.Clock()
 
     state_dim = 51
-    action_dim = 5
+    action_dim = 4
     agent = PPO(state_dim, action_dim, hidden_dim=512)
 
     if model_path:

@@ -86,6 +86,6 @@ class DoubleQAgent:
         self.epsilon = ckpt.get("epsilon", self.epsilon)
         self.alpha = ckpt.get("alpha", self.alpha)
         self.gamma = ckpt.get("gamma", self.gamma)
-        self.actions = ckpt.get("actions", self.actions)
+        # self.actions = ckpt.get("actions", self.actions)
         self.optimistic_init = ckpt.get("optimistic_init", self.optimistic_init)
         return ckpt.get("meta", {})

@@ -14,6 +14,7 @@ from agents.A2C.utilities import Utilities
 from agents.PPO.PPO import PPO
 from agents.rainbowDQN.rainbow_agent import RainbowDQNAgent
 from agents.rainbowDQN.utils import get_state
+from agents.DOUBLE_Q.double_q_agent import DoubleQAgent
 
 
 class AgentsBattle:
@@ -26,7 +27,8 @@ class AgentsBattle:
         self.games = {
             'A2C': Game(level = difficulty, infinite_mode = infinite_mode),
             'PPO': Game(level = difficulty, infinite_mode = infinite_mode),
-            'Rainbow': Game(level = difficulty, infinite_mode = infinite_mode)
+            'Rainbow': Game(level = difficulty, infinite_mode = infinite_mode),
+            'DoubleQ': Game(level = difficulty, infinite_mode = infinite_mode)
         }
         
         self.agents = {}
@@ -35,7 +37,8 @@ class AgentsBattle:
         self.scores = {
             'A2C': {'wins': 0, 'max_progress': 0, 'deaths': 0, 'alive': True, 'survival_time': 0},
             'PPO': {'wins': 0, 'max_progress': 0, 'deaths': 0, 'alive': True, 'survival_time': 0},
-            'Rainbow': {'wins': 0, 'max_progress': 0, 'deaths': 0, 'alive': True, 'survival_time': 0}
+            'Rainbow': {'wins': 0, 'max_progress': 0, 'deaths': 0, 'alive': True, 'survival_time': 0},
+            'DoubleQ': {'wins': 0, 'max_progress': 0, 'deaths': 0, 'alive': True, 'survival_time': 0}
         }
         
         self.frame_count = 0
@@ -44,7 +47,8 @@ class AgentsBattle:
         self.agent_colors = {
             'A2C': (100, 150, 200),
             'PPO': (200, 100, 100),
-            'Rainbow': (160, 120, 180)
+            'Rainbow': (160, 120, 180),
+            'DoubleQ': (100, 200, 100)
         }
         
     def _load_agents(self):
@@ -82,6 +86,15 @@ class AgentsBattle:
             rainbow_checkpoint_path = "agents/rainbowDQN/checkpoints/RainbowBot/rainbow_best_agent.pth"
         self.agents['Rainbow'].load(rainbow_checkpoint_path)
         print(f"Rainbow loaded from {rainbow_checkpoint_path}")
+        
+        print("Loading DoubleQ")
+        doubleq_checkpoint_path = f"agents/DOUBLE_Q/checkpoints/run_1_{self.difficulty}/doubleq_best.pkl"
+        if not os.path.exists(doubleq_checkpoint_path):
+            doubleq_checkpoint_path = "agents/DOUBLE_Q/checkpoints/doubleq_best.pkl"
+        actions = ["UP", "DOWN", "LEFT", "RIGHT"]
+        self.agents['DoubleQ'] = DoubleQAgent(actions=actions, alpha=0.25, gamma=0.99, epsilon=0.0)
+        self.agents['DoubleQ'].load(doubleq_checkpoint_path)
+        print(f"DoubleQ loaded from {doubleq_checkpoint_path}")
     
     def get_a2c_action(self, game):
         
@@ -124,6 +137,93 @@ class AgentsBattle:
         state = get_state(game, view_range = 5)
         action = self.agents['Rainbow'].select_action(state, training = False)
         return action
+    
+    def get_doubleq_action(self, game):
+        
+        state = self._state_to_tabular(game)
+        action_str = self.agents['DoubleQ'].select_action(state)
+        action_map = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
+        return action_map[action_str]
+    
+    def _state_to_tabular(self, game, horizon=3):
+        
+        pr, pc = int(game.player_row), int(game.player_col)
+        
+        in_up = 1 if pr - 1 >= 0 else 0
+        in_down = 1 if pr + 1 < GRID_ROWS else 0
+        in_left = 1 if pc - 1 >= 0 else 0
+        in_right = 1 if pc + 1 < GRID_COLS else 0
+        
+        ttc_up = self._ttc_bin_for_cell(game, pr - 1, pc, horizon) if in_up else 0
+        ttc_up_l = self._ttc_bin_for_cell(game, pr - 1, pc - 1, horizon) if (in_up and in_left) else 0
+        ttc_up_r = self._ttc_bin_for_cell(game, pr - 1, pc + 1, horizon) if (in_up and in_right) else 0
+        
+        ttc_cur = self._ttc_bin_for_cell(game, pr, pc, horizon)
+        ttc_cur_l = self._ttc_bin_for_cell(game, pr, pc - 1, horizon) if in_left else 0
+        ttc_cur_r = self._ttc_bin_for_cell(game, pr, pc + 1, horizon) if in_right else 0
+        
+        ttc_down = self._ttc_bin_for_cell(game, pr + 1, pc, horizon) if in_down else 0
+        
+        safe_up = 1 if (in_up and ttc_up >= 2) else 0
+        safe_down = 1 if (in_down and ttc_down >= 2) else 0
+        safe_left = 1 if (in_left and ttc_cur_l >= 2) else 0
+        safe_right = 1 if (in_right and ttc_cur_r >= 2) else 0
+        
+        lane_cur = self._lane_is_road(game, pr)
+        lane_up = self._lane_is_road(game, pr - 1) if in_up else 0
+        
+        return (
+            pc,
+            lane_cur, lane_up,
+            in_up, in_down, in_left, in_right,
+            safe_up, safe_down, safe_left, safe_right,
+            ttc_up, ttc_up_l, ttc_up_r,
+            ttc_cur, ttc_cur_l, ttc_cur_r,
+        )
+    
+    def _ttc_bin_for_cell(self, game, target_row, target_col, horizon=3):
+        
+        if target_row < 0 or target_row >= GRID_ROWS or target_col < 0 or target_col >= GRID_COLS:
+            return 0
+        earliest = None
+        for car in game.cars:
+            if int(car.row) != int(target_row):
+                continue
+            
+            vel = self._car_velocity(car)
+            width = float(getattr(car, "width", 1.0))
+            
+            for k in range(0, horizon + 1):
+                col_k = float(car.col) + vel * k
+                if col_k <= target_col < col_k + width:
+                    if earliest is None or k < earliest:
+                        earliest = k
+                    break
+        
+        if earliest is None:
+            return 3
+        if earliest <= 0:
+            return 0
+        if earliest == 1:
+            return 1
+        if earliest == 2:
+            return 2
+        return 3
+    
+    def _car_velocity(self, car):
+        
+        sp = float(getattr(car, "speed", 0.0))
+        d = getattr(car, "direction", None)
+        if d is None:
+            return sp
+        d = float(d)
+        if sp < 0:
+            return sp
+        return sp * d
+    
+    def _lane_is_road(self, game, row):
+        
+        return 1 if any(int(c.row) == int(row) for c in game.cars) else 0
     
     def execute_action(self, game, action, agent_name):
         
@@ -194,9 +294,9 @@ class AgentsBattle:
         scoreboard_height = 80
         y_position = WINDOW_HEIGHT
         
-        pygame.draw.rect(screen, (30, 30, 30), (0, y_position, game_width * 3, scoreboard_height))
+        pygame.draw.rect(screen, (30, 30, 30), (0, y_position, game_width * 4, scoreboard_height))
         
-        x_positions = [game_width // 2, game_width + game_width // 2, 2 * game_width + game_width // 2]
+        x_positions = [game_width // 2, game_width + game_width // 2, 2 * game_width + game_width // 2, 3 * game_width + game_width // 2]
         
         for agent_index, (agent_name, agent_color) in enumerate(self.agent_colors.items()):
             x_center = x_positions[agent_index]
@@ -265,12 +365,12 @@ class AgentsBattle:
         
         pygame.init()
         
-        screen_width = WINDOW_WIDTH * 3
+        screen_width = WINDOW_WIDTH * 4
         screen_height = WINDOW_HEIGHT + 80
         screen = pygame.display.set_mode((screen_width, screen_height))
         
         mode_display_name = "STATISTICAL" if self.game_mode == 'statistical' else "SURVIVAL"
-        pygame.display.set_caption(f"Agents Battle 1v1v1 - {self.difficulty.upper()} - {mode_display_name}")
+        pygame.display.set_caption(f"Agents Battle 1v1v1v1 - {self.difficulty.upper()} - {mode_display_name}")
         
         game_clock = pygame.time.Clock()
         
@@ -326,8 +426,10 @@ class AgentsBattle:
                         action = self.get_a2c_action(game)
                     elif agent_name == 'PPO':
                         action = self.get_ppo_action(game)
-                    else:
+                    elif agent_name == 'Rainbow':
                         action = self.get_rainbow_action(game)
+                    else:
+                        action = self.get_doubleq_action(game)
                     
                     self.execute_action(game, action, agent_name)
                     
@@ -342,6 +444,7 @@ class AgentsBattle:
             self.draw_game_with_overlay(screen, self.games['A2C'], 0, 'A2C', self.agent_colors['A2C'])
             self.draw_game_with_overlay(screen, self.games['PPO'], WINDOW_WIDTH, 'PPO', self.agent_colors['PPO'])
             self.draw_game_with_overlay(screen, self.games['Rainbow'], WINDOW_WIDTH * 2, 'Rainbow', self.agent_colors['Rainbow'])
+            self.draw_game_with_overlay(screen, self.games['DoubleQ'], WINDOW_WIDTH * 3, 'DoubleQ', self.agent_colors['DoubleQ'])
             
             self.draw_scoreboard(screen, WINDOW_WIDTH)
             
@@ -351,7 +454,7 @@ class AgentsBattle:
         print(f"\n{'=' * 60}")
         print("FINAL RESULTS")
         print(f"{'=' * 60}")
-        for agent_name in ['A2C', 'PPO', 'Rainbow']:
+        for agent_name in ['A2C', 'PPO', 'Rainbow', 'DoubleQ']:
             agent_stats = self.scores[agent_name]
             print(f"{agent_name:10} - Wins: {agent_stats['wins']:3} | Deaths: {agent_stats['deaths']:3} | Best Row: {agent_stats['max_progress']:3}")
         print(f"{'=' * 60}\n")
@@ -362,8 +465,8 @@ class AgentsBattle:
 
 if __name__ == "__main__":
     import argparse
-    
-    argument_parser = argparse.ArgumentParser(description = 'Run 3-agent battle (A2C vs PPO vs RainbowDQN)')
+
+    argument_parser = argparse.ArgumentParser(description = 'Run 4-agent battle (A2C vs PPO vs Rainbow vs DoubleQ)')
     argument_parser.add_argument('--difficulty', type = str, default = 'medium', 
                         choices = ['easy', 'medium', 'medium-hard'],
                         help = 'Difficulty level (default: medium)')
