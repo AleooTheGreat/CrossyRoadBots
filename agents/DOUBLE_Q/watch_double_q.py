@@ -14,11 +14,14 @@ from agents.DOUBLE_Q.double_q_agent import DoubleQAgent
 
 
 ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT"]
+ACTIONS_MAP = {
+    "UP": "up",
+    "DOWN": "down",
+    "LEFT": "left",
+    "RIGHT": "right",
+}
 
 
-# =========================
-# Utils for TTC + state
-# =========================
 
 def _car_velocity(car) -> float:
     sp = float(getattr(car, "speed", 0.0))
@@ -57,12 +60,13 @@ def _lane_is_road(game, row):
 
 
 def state_to_tabular(game, horizon=3):
+
     pr, pc = int(game.player_row), int(game.player_col)
 
-    in_up = pr - 1 >= 0
-    in_down = pr + 1 < GRID_ROWS
-    in_left = pc - 1 >= 0
-    in_right = pc + 1 < GRID_COLS
+    in_up = int(pr - 1 >= 0)
+    in_down = int(pr + 1 < GRID_ROWS)
+    in_left = int(pc - 1 >= 0)
+    in_right = int(pc + 1 < GRID_COLS)
 
     ttc_up = _ttc_bin_for_cell(game, pr - 1, pc, horizon) if in_up else 0
     ttc_up_l = _ttc_bin_for_cell(game, pr - 1, pc - 1, horizon) if (in_up and in_left) else 0
@@ -72,10 +76,7 @@ def state_to_tabular(game, horizon=3):
     ttc_cur_l = _ttc_bin_for_cell(game, pr, pc - 1, horizon) if in_left else 0
     ttc_cur_r = _ttc_bin_for_cell(game, pr, pc + 1, horizon) if in_right else 0
 
-    safe_up = int(in_up and ttc_up >= 2)
-    safe_down = int(in_down and _ttc_bin_for_cell(game, pr + 1, pc, horizon) >= 2) if in_down else 0
-    safe_left = int(in_left and ttc_cur_l >= 2)
-    safe_right = int(in_right and ttc_cur_r >= 2)
+    ttc_down = _ttc_bin_for_cell(game, pr + 1, pc, horizon) if in_down else 0
 
     lane_cur = _lane_is_road(game, pr)
     lane_up = _lane_is_road(game, pr - 1) if in_up else 0
@@ -83,31 +84,11 @@ def state_to_tabular(game, horizon=3):
     return (
         pc,
         lane_cur, lane_up,
-        int(in_up), int(in_down), int(in_left), int(in_right),
-        safe_up, safe_down, safe_left, safe_right,
+        in_up, in_down, in_left, in_right,
         ttc_up, ttc_up_l, ttc_up_r,
         ttc_cur, ttc_cur_l, ttc_cur_r,
+        ttc_down,
     )
-
-
-def safe_fallback_action(state):
-    in_up, in_down, in_left, in_right = state[3:7]
-    safe_up, safe_down, safe_left, safe_right = state[7:11]
-
-    if in_up and safe_up:
-        return "UP"
-    if in_left and safe_left:
-        return "LEFT"
-    if in_right and safe_right:
-        return "RIGHT"
-    if in_down and safe_down:
-        return "DOWN"
-    return "UP"
-
-
-# =========================
-# Model loading
-# =========================
 
 def find_latest_model(difficulty):
     base = "agents/DOUBLE_Q/checkpoints"
@@ -127,11 +108,7 @@ def find_latest_model(difficulty):
     return max(ckpts, key=lambda p: int(p.split("_")[-1].replace(".pkl", ""))) if ckpts else None
 
 
-# =========================
-# WATCH
-# =========================
-
-def run_watch(difficulty="medium", model_path=None, horizon=3, fps=60):
+def run_watch(difficulty="hard", model_path=None, horizon=3, fps=60):
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption(f"Double Q-Learning TABULAR ({difficulty})")
@@ -150,11 +127,11 @@ def run_watch(difficulty="medium", model_path=None, horizon=3, fps=60):
     agent = DoubleQAgent(actions=ckpt.get("actions", ACTIONS))
     agent.Q1 = ckpt["Q1"]
     agent.Q2 = ckpt["Q2"]
-    agent.epsilon = 0.0
+    agent.epsilon = 0.0 
 
     game = Game(level=difficulty)
 
-    DECISION_DELAY = 0.15  # 🔥 AICI controlezi viteza
+    DECISION_DELAY = 0.15   
     last_decision = 0.0
 
     playing = True
@@ -183,12 +160,11 @@ def run_watch(difficulty="medium", model_path=None, horizon=3, fps=60):
             if step_once or (now - last_decision >= DECISION_DELAY):
                 s = state_to_tabular(game, horizon)
 
-                if s not in agent.Q1 and s not in agent.Q2:
-                    a = safe_fallback_action(s)
-                else:
-                    a = agent.select_action(s)
+                a = agent.select_action(s)
 
-                game.move_player(a.lower())
+                if a != "NOOP":
+                    game.move_player(ACTIONS_MAP[a])
+
                 game.update()
 
                 last_decision = now
@@ -209,9 +185,6 @@ def run_watch(difficulty="medium", model_path=None, horizon=3, fps=60):
     pygame.quit()
 
 
-# =========================
-# MAIN
-# =========================
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
