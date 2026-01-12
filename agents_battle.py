@@ -146,41 +146,36 @@ class AgentsBattle:
         return action_map[action_str]
     
     def _state_to_tabular(self, game, horizon=3):
-        
+
         pr, pc = int(game.player_row), int(game.player_col)
-        
-        in_up = 1 if pr - 1 >= 0 else 0
-        in_down = 1 if pr + 1 < GRID_ROWS else 0
-        in_left = 1 if pc - 1 >= 0 else 0
-        in_right = 1 if pc + 1 < GRID_COLS else 0
-        
+
+        in_up = int(pr - 1 >= 0)
+        in_down = int(pr + 1 < GRID_ROWS)
+        in_left = int(pc - 1 >= 0)
+        in_right = int(pc + 1 < GRID_COLS)
+
         ttc_up = self._ttc_bin_for_cell(game, pr - 1, pc, horizon) if in_up else 0
         ttc_up_l = self._ttc_bin_for_cell(game, pr - 1, pc - 1, horizon) if (in_up and in_left) else 0
         ttc_up_r = self._ttc_bin_for_cell(game, pr - 1, pc + 1, horizon) if (in_up and in_right) else 0
-        
+
         ttc_cur = self._ttc_bin_for_cell(game, pr, pc, horizon)
         ttc_cur_l = self._ttc_bin_for_cell(game, pr, pc - 1, horizon) if in_left else 0
         ttc_cur_r = self._ttc_bin_for_cell(game, pr, pc + 1, horizon) if in_right else 0
-        
+
         ttc_down = self._ttc_bin_for_cell(game, pr + 1, pc, horizon) if in_down else 0
-        
-        safe_up = 1 if (in_up and ttc_up >= 2) else 0
-        safe_down = 1 if (in_down and ttc_down >= 2) else 0
-        safe_left = 1 if (in_left and ttc_cur_l >= 2) else 0
-        safe_right = 1 if (in_right and ttc_cur_r >= 2) else 0
-        
+
         lane_cur = self._lane_is_road(game, pr)
         lane_up = self._lane_is_road(game, pr - 1) if in_up else 0
-        
+
         return (
             pc,
             lane_cur, lane_up,
             in_up, in_down, in_left, in_right,
-            safe_up, safe_down, safe_left, safe_right,
             ttc_up, ttc_up_l, ttc_up_r,
             ttc_cur, ttc_cur_l, ttc_cur_r,
+            ttc_down,
         )
-    
+
     def _ttc_bin_for_cell(self, game, target_row, target_col, horizon=3):
         
         if target_row < 0 or target_row >= GRID_ROWS or target_col < 0 or target_col >= GRID_COLS:
